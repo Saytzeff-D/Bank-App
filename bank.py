@@ -1,6 +1,7 @@
 import sys
 import random
 import mysql.connector as server
+import pwinput
 
 conn = server.connect(
     host = 'localhost',
@@ -14,8 +15,8 @@ class Bank:
     def __init__(self):        
         self.cursor = conn.cursor(dictionary=True)
     def _landing_page(self):
-        print(f"Hi There!\nWelcome to Zenith Bank Plc\nIn your best Interest.\n\nPress: ENTER Register with us, 0 to Login and 1 to exit.")
-        self.response = input('\n')
+        print(f"Hi There!\nWelcome to Zenith Bank Plc\nIn your best Interest.\n\nPress: ENTER Register with us, 0 to Login and 1 to exit.")        
+        self.response = input('\n').strip()
         if self.response == '':
             self.Register()
         elif self.response == '0':
@@ -26,12 +27,12 @@ class Bank:
         else:
             self._landing_page()            
     def Register(self):
-        self.fname = input('Enter your first name: ')
-        self.lname = input('Enter your last name: ')
-        self.email = input('Enter your E-Mail Address: ')
-        self.addr = input('Where do you live? ')
-        self.phoneNum = input('Phone Number: ')
-        self.password = input('Create a Password: ')
+        self.fname = input('Enter your first name: ').strip()
+        self.lname = input('Enter your last name: ').strip()
+        self.email = input('Enter your E-Mail Address: ').strip()
+        self.addr = input('Where do you live? ').strip()
+        self.phoneNum = input('Phone Number: ').strip()
+        self.password = pwinput.pwinput('Create a Password: ').strip()
         self.acctNum = random.randint(1000000000, 2000000000)
         sql = 'INSERT INTO users (first_name, last_name, email, acctNum, addr, phoneNum, password) VALUES (%s, %s, %s, %s, %s, %s, %s)'
         val = (self.fname, self.lname, self.email, self.acctNum, self.addr, self.phoneNum, self.password )
@@ -40,9 +41,9 @@ class Bank:
         print(f"\nHello {self.fname} {self.lname}. Registration successful\nYou're welcome to Zenith Bank Plc. Your account number is {self.acctNum}")
         self.Login()
     def Login(self):
-        print(f"\nDear User. Kindly Login to confirm that it is you!\n")
-        email = input('Enter your E-Mail: ')
-        password = input('Enter your Password: ')
+        print("\nDear User. Kindly Login to confirm that it is you!\n")
+        email = input('Enter your E-Mail: ').strip()
+        password = pwinput.pwinput('Enter your Password: ').strip()
         sql = 'SELECT * FROM users WHERE email = %s AND password = %s'
         val = (email, password)
         self.cursor.execute(sql, val)
@@ -65,7 +66,7 @@ class Menu(Bank):
             3. Airtime                4. Deposit
             5. Change PIN             99. Exit/Logout
         ''')
-        self.res = input('\n')
+        self.res = input('\n').strip()
         self.processMenu()
     def processMenu(self):
         if self.res == '1':
@@ -77,7 +78,7 @@ class Menu(Bank):
         elif self.res == '4':
             Deposit().process()
         elif self.res == '5':
-            print('5')
+            Pin().process()
         elif self.res == '99':
             print(f"Dear {user['first_name']}! You have logged out successfully.")
             sys.exit()
@@ -91,8 +92,8 @@ class Balance(Menu):
         sql = f"SELECT acctBal FROM users WHERE user_id = {user['user_id']}"
         self.cursor.execute(sql)
         result = self.cursor.fetchone()
-        print(f"\nYour account balance is NGN{result['acctBal']}\nPress 1. MAIN MENU OR 2. CANCEL")
-        response = input('\n')
+        print(f"\nYour account balance is NGN{result['acctBal']}\n\nPress 1. MAIN MENU OR 2. CANCEL")
+        response = input('\n').strip()
         if response == '1':
             self.printMenu()
         elif response == '2':
@@ -106,32 +107,41 @@ class Transfer(Menu):
     def __init__(self):
         super().__init__()
     def process(self):
-        amount = int(input('Enter Amount: '))
-        acctNum = input('Recipient Account Number: ')
+        amount = int(input('Enter Amount: ')).strip()
+        acctNum = input('Recipient Account Number: ').strip()
         sql = 'SELECT first_name, last_name, acctBal FROM users where acctNum = %s'
         self.cursor.execute(sql, [ acctNum ])
         userDetails = self.cursor.fetchone()
         if userDetails != None:
-            print(f"\nTransfer NGN{float(amount)} to {userDetails['first_name']} {userDetails['last_name']}?\nPRESS 1 to Continue OR 2 to Cancel")
-            res = input('')
+            print(f"\nTransfer NGN{float(amount)} to {userDetails['first_name']} {userDetails['last_name']}?\n\nPRESS 1 to Continue OR 2 to Cancel")
+            res = input('').strip()
             if res == '1':
-                if float(amount) <= float(user['acctBal']):                    
-                    sql = 'UPDATE users SET acctBal = %s WHERE acctNum = %s'
-                    val = [(float(userDetails['acctBal']) + float(amount), acctNum), (float(user['acctBal']) - float(amount), user['acctNum'])]
-                    for each in val:
-                        self.cursor.execute(sql, each)
-                    conn.commit()
-                    print(f"\nYou have successfully transferred {float(amount)} to {userDetails['first_name']} {userDetails['last_name']}\nPRESS 1 for MENU or 2 to EXIT")
-                    res = input('')
-                    if res == '1':
-                        self.printMenu()
-                    elif res == '2':
-                        sys.exit()
-                    else: 
-                        print('\nInvalid Service Code')
+                pin = input('Enter Pin: ').strip()
+                sql = f"SELECT pin FROM users WHERE user_id = {user['user_id']}"
+                self.cursor.execute(sql)
+                userPin = self.cursor.fetchone()['pin']
+                if userPin == pin:
+                    if float(amount) <= float(user['acctBal']):                    
+                        sql = 'UPDATE users SET acctBal = %s WHERE acctNum = %s'
+                        val = [(float(userDetails['acctBal']) + float(amount), acctNum), (float(user['acctBal']) - float(amount), user['acctNum'])]
+                        for each in val:
+                            self.cursor.execute(sql, each)
+                        conn.commit()
+                        print(f"\nYou have successfully transferred {float(amount)} to {userDetails['first_name']} {userDetails['last_name']}\n\nPRESS 1 for MENU or 2 to EXIT")
+                        res = input('').strip()
+                        if res == '1':
+                            self.printMenu()
+                        elif res == '2':
+                            sys.exit()
+                        else: 
+                            print('\nInvalid Service Code')
+                            sys.exit()
+                    else:
+                        print('\nInsufficient Balance')
                         sys.exit()
                 else:
-                    print('Insufficient Balance')
+                    print('\nIncorrect Pin')
+                    sys.exit()
             elif res == '2':
                 self.printMenu()
             else:
@@ -139,32 +149,32 @@ class Transfer(Menu):
                 sys.exit()
         else:
             print('\nAccount Number does not exist')
-            self.printMenu()
+            sys.exit()
 
 class Deposit(Menu):
     def __init__(self):
         super().__init__()
     def process(self):
-        amount = input('\nDeposit Amount: ')
+        amount = input('\nDeposit Amount: ').strip()
         sql = 'SELECT acctBal FROM users WHERE user_id = %s'
         self.cursor.execute(sql, [ user['user_id'] ])
         result = self.cursor.fetchone()
         print(f"\nDear {user['first_name']}!\nAre you sure you want to deposit NGN{float(amount)} into your account?\n1. YES  2. NO")
-        res = input('\n')
+        res = input('\n').strip()
         if res == '1':
             sql = 'UPDATE users SET acctBal = %s WHERE user_id = %s'
             val = (float(amount) + float(result['acctBal']), user['user_id'])
             self.cursor.execute(sql, val)
             conn.commit()
-            print(f"\nDeposit of NGN{float(amount)} was successful!\nPRESS 1 to go to Main Menu\n")
-            res = input('')
+            print(f"\nDeposit of NGN{float(amount)} was successful!\n\nPRESS 1 to go to Main Menu\n")
+            res = input('').strip()
             if res == '1':
                 self.printMenu()
             else:
                 sys.exit()
         elif res == '2':
-            print('\nOperation Cancelled!\nPRESS 1 to go to Main Menu\n')
-            res = input('')
+            print(f'\nOperation Cancelled!\n\nPRESS 1 to go to {("Main Menu").upper()}\n')
+            res = input('').strip()
             if res == '1':
                 self.printMenu()
             else:
@@ -177,46 +187,82 @@ class Airtime(Menu):
         super().__init__()
     def process(self):
         print('\nPRESS 1. Self  2. Others')
-        response = input('\n')
-        amount = input('\nEnter Amount: ')
+        response = input('\n').strip()
+        amount = input('\nEnter Amount: ').strip()
         if response == '1':
-            sql = f"SELECT acctBal FROM users WHERE user_id = {user['user_id']}"
+            pin = input('\nEnter Pin: ').strip()
+            sql = f"SELECT pin FROM users WHERE user_id = {user['user_id']}"
             self.cursor.execute(sql)
-            result = self.cursor.fetchone()
-            if float(result['acctBal']) >= float(amount):
-                sql = f"UPDATE users SET acctBal = {float(result['acctBal']) - float(amount)}"
+            userPin = self.cursor.fetchone()['pin']
+            if userPin == pin:
+                sql = f"SELECT acctBal FROM users WHERE user_id = {user['user_id']}"
                 self.cursor.execute(sql)
-                conn.commit()
-                print(f"\nRecharge Card of NGN{amount} was successful.\nPRESS 1 to go to MAIN MENU or any other to key to EXIT")
-                res = input('\n')
-                if res == '1':
-                    self.printMenu()
+                result = self.cursor.fetchone()
+                if float(result['acctBal']) >= float(amount):
+                    sql = f"UPDATE users SET acctBal = {float(result['acctBal']) - float(amount)}"
+                    self.cursor.execute(sql)
+                    conn.commit()
+                    print(f"\nRecharge Card of NGN{amount} was successful.\n\nPRESS 1 to go to MAIN MENU or any other to key to EXIT")
+                    res = input('\n').strip()
+                    if res == '1':
+                        self.printMenu()
+                    else:
+                        sys.exit()
                 else:
+                    print('\nInsufficient Balance')
                     sys.exit()
             else:
-                print('\nInsufficient Balance')
-                sys.exit()
+                print('\nIncorrect Pin')
         elif response == '2':
-            phone = input('\nRecipient Phone Number: ')
-            sql = f"SELECT acctBal FROM users WHERE user_id = {user['user_id']}"
+            phone = input('\nRecipient Phone Number: ').strip()
+            pin = input('\nEnter Pin: ').strip()
+            sql = f"SELECT pin FROM users WHERE user_id = {user['user_id']}"
             self.cursor.execute(sql)
-            result = self.cursor.fetchone()
-            if float(result['acctBal']) >= float(amount):
-                sql = f"UPDATE users SET acctBal = {float(result['acctBal']) - float(amount)}"
+            userPin = self.cursor.fetchone()['pin']
+            if userPin == pin:
+                sql = f"SELECT acctBal FROM users WHERE user_id = {user['user_id']}"
                 self.cursor.execute(sql)
-                conn.commit()
-                print(f"\nRecharge Card of NGN{amount} has been sent to {phone}.\nPRESS 1 to go to MAIN MENU or any other to key to EXIT")
-                res = input('\n')
-                if res == '1':
-                    self.printMenu()
+                result = self.cursor.fetchone()
+                if float(result['acctBal']) >= float(amount):
+                    sql = f"UPDATE users SET acctBal = {float(result['acctBal']) - float(amount)}"
+                    self.cursor.execute(sql)
+                    conn.commit()
+                    print(f"\nRecharge Card of NGN{amount} has been sent to {phone}.\n\nPRESS 1 to go to MAIN MENU or any other to key to EXIT")
+                    res = input('\n').strip()
+                    if res == '1':
+                        self.printMenu()
+                    else:
+                        sys.exit()
                 else:
+                    print('\nInsufficient Balance')
                     sys.exit()
             else:
-                print('\nInsufficient Balance')
-                sys.exit()
+                print('\nIncorrect Pin')
         else:
-            sys.exit
+            sys.exit()
 
+class Pin(Menu):
+    def __init__(self):
+        super().__init__()
+    def process(self):
+        print('\nDefault PIN is 0000')
+        old_pin = input('Enter Old Pin: ').strip()
+        new_pin = input('\nEnter New Pin: ').strip()
+        confirm_new_pin = input('Confirm New Pin: ').strip()
+        sql = f"SELECT pin FROM users WHERE user_id = {user['user_id']}"
+        self.cursor.execute(sql)
+        pin = self.cursor.fetchone()['pin']
+        if pin == old_pin:
+            if new_pin == confirm_new_pin:
+                sql = "UPDATE users SET pin = %s WHERE user_id = %s"
+                val = (new_pin, user['user_id'])
+                self.cursor.execute(sql, val)
+                conn.commit()
+                print('\nPin changed successfully')
+            else:
+                print('\nPin does not match')
+        else:
+            print('\nOld Pin is not correct...')
     
 bank = Bank()
 bank._landing_page()
