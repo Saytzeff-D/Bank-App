@@ -2,6 +2,7 @@ import sys
 import random
 import mysql.connector as server
 import pwinput
+import termtables as term_tb
 
 conn = server.connect(
     host = 'localhost',
@@ -134,8 +135,8 @@ class Transfer(Menu):
                         conn.commit()
                         trxInsertQuery = "INSERT INTO transactions (amount, trx_ref, beneficiary, type, user_id) VALUES(%s, %s, %s, %s, %s)"
                         val = [
-                            (amount, random.randint(200000000000000, 999900999999999), acctNum, 'Debit', user['user_id']),
-                            (amount, random.randint(200000000000000, 999900999999999), acctNum, 'Credit', beneficiary['user_id'])
+                            (amount, str(random.randint(200000000000000, 999900999999999)), str(acctNum), 'Debit', user['user_id']),
+                            (amount, str(random.randint(200000000000000, 999900999999999)), str(acctNum), 'Credit', beneficiary['user_id'])
                         ]
                         self.cursor.executemany(trxInsertQuery, val)
                         conn.commit()
@@ -179,7 +180,7 @@ class Deposit(Menu):
             self.cursor.execute(sql, val)
             conn.commit()
             trxInsertQuery = "INSERT INTO transactions (amount, trx_ref, beneficiary, type, user_id) VALUES(%s, %s, %s, %s, %s)"
-            val = (amount, random.randint(200000000000000, 999900999999999), user['acctNum'], 'Credit', user['user_id'])
+            val = (amount, str(random.randint(200000000000000, 999900999999999)), str(user['acctNum']), 'Credit', user['user_id'])
             self.cursor.execute(trxInsertQuery, val)
             conn.commit()
             print(f"\nDeposit of NGN{float(amount)} was successful!\n\nPRESS 1 to go to Main Menu\n")
@@ -219,7 +220,7 @@ class Airtime(Menu):
                     self.cursor.execute(sql)
                     conn.commit()
                     trxInsertQuery = "INSERT INTO transactions (amount, trx_ref, beneficiary, type, user_id) VALUES(%s, %s, %s, %s, %s)"
-                    val = (amount, random.randint(200000000000000, 999900999999999), user['phoneNum'], 'Debit', user['user_id'])
+                    val = (amount, str(random.randint(200000000000000, 999900999999999)), str(user['phoneNum']), 'Debit', user['user_id'])
                     self.cursor.execute(trxInsertQuery, val)
                     conn.commit()
                     print(f"\nRecharge Card of NGN{amount} was successful.\n\nPRESS 1 to go to MAIN MENU or any other to key to EXIT")
@@ -248,7 +249,7 @@ class Airtime(Menu):
                     self.cursor.execute(sql)
                     conn.commit()
                     trxInsertQuery = "INSERT INTO transactions (amount, trx_ref, beneficiary, type, user_id) VALUES(%s, %s, %s, %s, %s)"
-                    val = (amount, random.randint(200000000000000, 999900999999999), phone, 'Debit', user['user_id'])
+                    val = (amount, str(random.randint(200000000000000, 999900999999999)), str(phone), 'Debit', user['user_id'])
                     self.cursor.execute(trxInsertQuery, val)
                     conn.commit()
                     print(f"\nRecharge Card of NGN{amount} has been sent to {phone}.\n\nPRESS 1 to go to MAIN MENU or any other to key to EXIT")
@@ -293,10 +294,23 @@ class History(Menu):
         super().__init__()
         self.history = []
     def process(self):
-        sql = f"SELECT * FROM transactions JOIN users USING(user_id) WHERE user_id = {user['user_id']}"
+        sql = f"SELECT trx_ref, amount, beneficiary, type, transact_at FROM transactions WHERE user_id = {user['user_id']}"
         self.cursor.execute(sql)
         self.history = self.cursor.fetchall()
-        print(self.history)
+        t_data = []
+        for each in self.history:
+            t_data.append(list(each.values()))        
+        table = term_tb.to_string(
+            t_data, 
+            header=['Trx Ref', 'Amount(NGN)', 'Beneficiary', 'Transaction Type', 'Transaction Date'],
+            style=term_tb.styles.ascii_thin_double,
+        )        
+        print(f"\n{table}\n\nPRESS 1 to go to MAIN MENU or any other to key to EXIT")
+        res = input('\n').strip()
+        if res == '1':
+            self.printMenu()
+        else:
+            sys.exit()
     
 bank = Bank()
 bank._landing_page()
