@@ -64,7 +64,8 @@ class Menu(Bank):
             Zenith Bank Plc\n
             1. Check Balance          2. Transfer
             3. Airtime                4. Deposit
-            5. Change PIN             99. Exit/Logout
+            5. Change PIN             6. Check History
+            99. Exit/Logout
         ''')
         self.res = input('\n').strip()
         self.processMenu()
@@ -79,6 +80,8 @@ class Menu(Bank):
             Deposit().process()
         elif self.res == '5':
             Pin().process()
+        elif self.res == '6':
+            History().process()
         elif self.res == '99':
             print(f"Dear {user['first_name']}! You have logged out successfully.")
             sys.exit()
@@ -107,13 +110,13 @@ class Transfer(Menu):
     def __init__(self):
         super().__init__()
     def process(self):
-        amount = int(input('Enter Amount: ')).strip()
+        amount = int(input('Enter Amount: ').strip())
         acctNum = input('Recipient Account Number: ').strip()
-        sql = 'SELECT first_name, last_name, acctBal FROM users where acctNum = %s'
+        sql = 'SELECT user_id, first_name, last_name, acctBal FROM users where acctNum = %s'
         self.cursor.execute(sql, [ acctNum ])
-        userDetails = self.cursor.fetchone()
-        if userDetails != None:
-            print(f"\nTransfer NGN{float(amount)} to {userDetails['first_name']} {userDetails['last_name']}?\n\nPRESS 1 to Continue OR 2 to Cancel")
+        beneficiary = self.cursor.fetchone()
+        if beneficiary != None:
+            print(f"\nTransfer NGN{float(amount)} to {beneficiary['first_name']} {beneficiary['last_name']}?\n\nPRESS 1 to Continue OR 2 to Cancel")
             res = input('').strip()
             if res == '1':
                 pin = input('Enter Pin: ').strip()
@@ -123,11 +126,20 @@ class Transfer(Menu):
                 if userPin == pin:
                     if float(amount) <= float(user['acctBal']):                    
                         sql = 'UPDATE users SET acctBal = %s WHERE acctNum = %s'
-                        val = [(float(userDetails['acctBal']) + float(amount), acctNum), (float(user['acctBal']) - float(amount), user['acctNum'])]
-                        for each in val:
-                            self.cursor.execute(sql, each)
+                        debitAmount = float(user['acctBal']) - float(amount)
+                        creditAmount = float(beneficiary['acctBal']) + float(amount)
+                        val = [(creditAmount, acctNum), (debitAmount, user['acctNum'])]
+                        self.cursor.executemany(sql, val)
+                        # for each in val:
                         conn.commit()
-                        print(f"\nYou have successfully transferred {float(amount)} to {userDetails['first_name']} {userDetails['last_name']}\n\nPRESS 1 for MENU or 2 to EXIT")
+                        trxInsertQuery = "INSERT INTO transactions (amount, trx_ref, beneficiary, type, user_id) VALUES(%s, %s, %s, %s, %s)"
+                        val = [
+                            (amount, random.randint(200000000000000, 999900999999999), acctNum, 'Debit', user['user_id']),
+                            (amount, random.randint(200000000000000, 999900999999999), acctNum, 'Credit', beneficiary['user_id'])
+                        ]
+                        self.cursor.executemany(trxInsertQuery, val)
+                        conn.commit()
+                        print(f"\nYou have successfully transferred {float(amount)} to {beneficiary['first_name']} {beneficiary['last_name']}\n\nPRESS 1 for MENU or 2 to EXIT")
                         res = input('').strip()
                         if res == '1':
                             self.printMenu()
@@ -166,6 +178,10 @@ class Deposit(Menu):
             val = (float(amount) + float(result['acctBal']), user['user_id'])
             self.cursor.execute(sql, val)
             conn.commit()
+            trxInsertQuery = "INSERT INTO transactions (amount, trx_ref, beneficiary, type, user_id) VALUES(%s, %s, %s, %s, %s)"
+            val = (amount, random.randint(200000000000000, 999900999999999), user['acctNum'], 'Credit', user['user_id'])
+            self.cursor.execute(trxInsertQuery, val)
+            conn.commit()
             print(f"\nDeposit of NGN{float(amount)} was successful!\n\nPRESS 1 to go to Main Menu\n")
             res = input('').strip()
             if res == '1':
@@ -202,6 +218,10 @@ class Airtime(Menu):
                     sql = f"UPDATE users SET acctBal = {float(result['acctBal']) - float(amount)}"
                     self.cursor.execute(sql)
                     conn.commit()
+                    trxInsertQuery = "INSERT INTO transactions (amount, trx_ref, beneficiary, type, user_id) VALUES(%s, %s, %s, %s, %s)"
+                    val = (amount, random.randint(200000000000000, 999900999999999), user['phoneNum'], 'Debit', user['user_id'])
+                    self.cursor.execute(trxInsertQuery, val)
+                    conn.commit()
                     print(f"\nRecharge Card of NGN{amount} was successful.\n\nPRESS 1 to go to MAIN MENU or any other to key to EXIT")
                     res = input('\n').strip()
                     if res == '1':
@@ -226,6 +246,10 @@ class Airtime(Menu):
                 if float(result['acctBal']) >= float(amount):
                     sql = f"UPDATE users SET acctBal = {float(result['acctBal']) - float(amount)}"
                     self.cursor.execute(sql)
+                    conn.commit()
+                    trxInsertQuery = "INSERT INTO transactions (amount, trx_ref, beneficiary, type, user_id) VALUES(%s, %s, %s, %s, %s)"
+                    val = (amount, random.randint(200000000000000, 999900999999999), phone, 'Debit', user['user_id'])
+                    self.cursor.execute(trxInsertQuery, val)
                     conn.commit()
                     print(f"\nRecharge Card of NGN{amount} has been sent to {phone}.\n\nPRESS 1 to go to MAIN MENU or any other to key to EXIT")
                     res = input('\n').strip()
@@ -263,6 +287,16 @@ class Pin(Menu):
                 print('\nPin does not match')
         else:
             print('\nOld Pin is not correct...')
+
+class History(Menu):
+    def __init__(self):
+        super().__init__()
+        self.history = []
+    def process(self):
+        sql = f"SELECT * FROM transactions JOIN users USING(user_id) WHERE user_id = {user['user_id']}"
+        self.cursor.execute(sql)
+        self.history = self.cursor.fetchall()
+        print(self.history)
     
 bank = Bank()
 bank._landing_page()
