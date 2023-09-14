@@ -3,20 +3,30 @@ import random
 import mysql.connector as server
 import pwinput
 import termtables as term_tb
+from colorama import init, Fore
 
-conn = server.connect(
-    host = 'localhost',
-    user = 'root',
-    password = '',
-    database = 'bank'
-)
+init()
 
+print(Fore.YELLOW,'\n>>> Initialising Database Connection...')
+
+try:
+    conn = server.connect(
+        host = 'localhost',
+        user = 'root',
+        password = '',
+        database = 'bank'
+    )
+except server.errors.DatabaseError:
+    print(Fore.RED, '\n>>> Refused to connect...\n>>> Check your database connection')
+    sys.exit()
+else:
+    print(Fore.GREEN,'\n>>> Connection Initialised Successfully')
 
 class Bank:
     def __init__(self):        
         self.cursor = conn.cursor(dictionary=True)
     def _landing_page(self):
-        print(f"Hi There!\nWelcome to Zenith Bank Plc\nIn your best Interest.\n\nPress: ENTER Register with us, 0 to Login and 1 to exit.")        
+        print(f"{Fore.RESET}\nHi There!\nWelcome to Zenith Bank Plc\nIn your best Interest.\n\nPress: ENTER Register with us, 0 to Login and 1 to exit.")        
         self.response = input('\n').strip()
         if self.response == '':
             self.Register()
